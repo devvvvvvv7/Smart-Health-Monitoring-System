@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Health Monitoring System</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: linear-gradient(145deg, #ffffff, #f8fafc);
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 32px;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 20px 20px 0 0;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        }
+
+        .card.alert {
+            background: linear-gradient(145deg, #fef2f2, #fee2e2);
+            border-color: #fca5a5;
+            animation: pulse 2s infinite;
+        }
+
+        .card.alert::before {
+            background: linear-gradient(90deg, #ef4444, #dc2626);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            }
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.8;
+        }
+
+        .temp-icon { color: #ef4444; }
+        .spo2-icon { color: #3b82f6; }
+        .hr-icon { color: #10b981; }
+
+        .card h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+
+        .card .value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 8px;
+        }
+
+        .card .status {
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 4px 12px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .status.normal {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status.alert {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .chart-container {
+            background: linear-gradient(145deg, #ffffff, #f8fafc);
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 32px;
+            margin-top: 20px;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .chart-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .last-update {
+            font-size: 0.875rem;
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        canvas {
+            border-radius: 12px;
+        }
+
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 20px;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .connected {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .disconnected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: blink 2s infinite;
+        }
+
+        .connected .status-dot {
+            background: #10b981;
+        }
+
+        .disconnected .status-dot {
+            background: #ef4444;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 24px;
+                margin: 10px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .dashboard {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .card {
+                padding: 24px;
+            }
+
+            .chart-container {
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-heartbeat"></i> Smart Health Monitor</h1>
+            <p>Real-time vital signs monitoring with intelligent alerts</p>
+        </div>
+
+        <div class="dashboard">
+            <div class="card" id="tempCard">
+                <div class="card-icon temp-icon">
+                    <i class="fas fa-thermometer-half"></i>
+                </div>
+                <h3>Body Temperature</h3>
+                <div class="value" id="temp">--°C</div>
+                <span class="status normal" id="tempStatus">Normal</span>
+            </div>
+
+            <div class="card" id="spo2Card">
+                <div class="card-icon spo2-icon">
+                    <i class="fas fa-lungs"></i>
+                </div>
+                <h3>Blood Oxygen (SpO2)</h3>
+                <div class="value" id="spo2">--%</div>
+                <span class="status normal" id="spo2Status">Normal</span>
+            </div>
+
+            <div class="card" id="hrCard">
+                <div class="card-icon hr-icon">
+                    <i class="fas fa-heartbeat"></i>
+                </div>
+                <h3>Heart Rate</h3>
+                <div class="value" id="hr">-- bpm</div>
+                <span class="status normal" id="hrStatus">Normal</span>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-header">
+                <h3 class="chart-title"><i class="fas fa-chart-line"></i> Vital Signs Trend</h3>
+                <div class="last-update" id="lastUpdate">Last updated: --</div>
+            </div>
+            <div id="chartWrapper">
+                <canvas id="chart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <div class="connection-status connected" id="connectionStatus">
+            <div class="status-dot"></div>
+            <span>Connected to monitoring system</span>
+        </div>
+    </div>
+
+    <script>
+        // Firebase config - Replace with your actual config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com/",
+            projectId: "YOUR_PROJECT",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // DOM Elements
+        const tempEl = document.getElementById('temp');
+        const spo2El = document.getElementById('spo2');
+        const hrEl = document.getElementById('hr');
+        const tempCard = document.getElementById('tempCard');
+        const spo2Card = document.getElementById('spo2Card');
+        const hrCard = document.getElementById('hrCard');
+        const tempStatus = document.getElementById('tempStatus');
+        const spo2Status = document.getElementById('spo2Status');
+        const hrStatus = document.getElementById('hrStatus');
+        const lastUpdate = document.getElementById('lastUpdate');
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        // Chart setup
+        const ctx = document.getElementById('chart').getContext('2d');
+        let chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Temperature (°C)',
+                        data: [],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'SpO2 (%)',
+                        data: [],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Heart Rate (bpm)',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            font: {
+                                size: 12,
+                                weight: '500'
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time',
+                            font: {
+                                size: 14,
+                                weight: '500'
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Values',
+                            font: {
+                                size: 14,
+                                weight: '500'
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            }
+        });
+
+        // Normal ranges for alerts
+        const normal = {
+            temp: [36, 37.5],
+            spo2: [95, 100],
+            hr: [60, 100]
+        };
+
+        // Update status function
+        function updateStatus(value, range, statusEl, cardEl) {
+            const isNormal = value >= range[0] && value <= range[1];
+            statusEl.textContent = isNormal ? 'Normal' : 'Alert';
+            statusEl.className = isNormal ? 'status normal' : 'status alert';
+            
+            if (isNormal) {
+                cardEl.classList.remove('alert');
+            } else {
+                cardEl.classList.add('alert');
+            }
+        }
+
+
+        function updateDisplay(data) {
+            const time = new Date().toLocaleTimeString();
+            
+            // Update values
+            tempEl.textContent = data.temp + '°C';
+            spo2El.textContent = data.spo2 + '%';
+            hrEl.textContent = data.hr + ' bpm';
+            
+            // Update last update time
+            lastUpdate.textContent = 'Last updated: ' + time;
+            
+            // Update status indicators
+            updateStatus(parseFloat(data.temp), normal.temp, tempStatus, tempCard);
+            updateStatus(parseInt(data.spo2), normal.spo2, spo2Status, spo2Card);
+            updateStatus(parseInt(data.hr), normal.hr, hrStatus, hrCard);
+
+            // Update chart
+            chart.data.labels.push(time);
+            chart.data.datasets[0].data.push(parseFloat(data.temp));
+            chart.data.datasets[1].data.push(parseInt(data.spo2));
+            chart.data.datasets[2].data.push(parseInt(data.hr));
+
+            // Keep only last 15 data points
+            if (chart.data.labels.length > 15) {
+                chart.data.labels.shift();
+                chart.data.datasets.forEach(dataset => dataset.data.shift());
+            }
+            
+            chart.update('none'); // Smooth update without animation
+        }
+
+        // Firebase real-time listener
+        db.ref('health').on('value', snapshot => {
+            const data = snapshot.val();
+            if (data) {
+                updateDisplay(data);
+                connectionStatus.className = 'connection-status connected';
+                connectionStatus.innerHTML = '<div class="status-dot"></div><span>Connected to monitoring system</span>';
+            }
+        }, error => {
+            console.error('Firebase error:', error);
+            connectionStatus.className = 'connection-status disconnected';
+            connectionStatus.innerHTML = '<div class="status-dot"></div><span>Connection lost</span>';
+        });
+    </script>
+</body>
+</html>
